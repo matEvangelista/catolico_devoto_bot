@@ -1,8 +1,12 @@
+import datetime
+import pytz
 import telebot
+from telebot.types import InputMediaPhoto
 from bs4 import BeautifulSoup
 import requests as re
 from os import environ
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 API_TOKEN = environ['API_TOKEN']
@@ -45,6 +49,17 @@ def get_saint_name(soup: BeautifulSoup) -> str:
     return "<b>" + soup.find('h1', attrs={'class': 'entry-title'}).text.strip() + "</b>\n\n"
 
 
+def get_rosary(day: int) -> dict:
+    """
+    Função para retornar os mistérios do dia e informações úteis
+    :param day: dia da semana (0 é segunda-feira)
+    :return: dicionário do mistério
+    """
+    with open("rosario.json", encoding='UTF-8') as ros:
+        rosary = json.load(ros)
+    return rosary[str(day)]
+
+
 # FUNÇÕES DE INTERAÇÃO
 
 # Define a command handler
@@ -61,13 +76,13 @@ def send_welcome(message):
 @bot.message_handler(commands=['info'])
 def send_info(message):
     bot.reply_to(message,
-                 "<b>Lista de comandos:\n</b>"
+                 "<b>Lista de comandos:</b>\n"
                  "/santo_do_dia: retorna imagem e oração do santo do dia\n"
                  "/folheto: folheto da missa dominical\n"
                  "/biblia: escreva \"/biblia sigla:versiculo\" para um versículo "
                  "ou \"biblia sigla:versiculo1-versiculo2\".\n"
                  "Por exemplo: \"Mt 16:18\" ou \"Jo 15:1-9\"\n"
-                 "Caso não conheça as siglas de cor, digite /sigla")
+                 "Caso não conheça as siglas de cor, digite /sigla", parse_mode="HTML")
 
 
 # funcao para santo do dia
@@ -83,6 +98,26 @@ def send_saint(message):
     except Exception as e:
         print(e)
         bot.reply_to(message, "Infelizmente, não foi possível executar este comando.")
+
+
+# função para o rosário
+@bot.message_handler(commands=['terco', 'rosario', 'terço', 'rosário'])
+def send_rosary(message):
+    timezone = pytz.timezone('America/Sao_Paulo')
+    day = datetime.datetime.now(timezone).weekday()
+    rosary = get_rosary(day)
+    imgs = rosary['imgs']
+    imgs_to_be_sent = []
+    caption = "*" + rosary['title'] + "*" + "\n\n" + rosary['text'] + "\n\n" + (f"Caso queira ser acompanhado(a) "
+                                                                                f"em suas orações, "
+                                                                                f"[recomendamos "
+                                                                                f"este video.]({rosary['video']})")
+    for i in range(len(imgs)):
+        if i != 0:
+            imgs_to_be_sent.append(InputMediaPhoto(imgs[i], parse_mode="Markdown"))
+        else:
+            imgs_to_be_sent.append(InputMediaPhoto(imgs[i], caption=caption, parse_mode="Markdown"))
+    bot.send_media_group(message.chat.id, imgs_to_be_sent)
 
 
 @bot.message_handler(commands=['folheto'])
