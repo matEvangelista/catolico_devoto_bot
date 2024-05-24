@@ -79,10 +79,11 @@ def send_info(message):
                  "<b>Lista de comandos:</b>\n"
                  "/santo_do_dia: retorna imagem e oração do santo do dia\n"
                  "/folheto: folheto da missa dominical\n"
+                 "/terco: mistérios do terço deste dia\n"
                  "/biblia: escreva \"/biblia sigla:versiculo\" para um versículo "
                  "ou \"biblia sigla:versiculo1-versiculo2\".\n"
                  "Por exemplo: \"Mt 16:18\" ou \"Jo 15:1-9\"\n"
-                 "Caso não conheça as siglas de cor, digite /sigla", parse_mode="HTML")
+                 "Caso não conheça as siglas de cor, digite /siglas", parse_mode="HTML")
 
 
 # funcao para santo do dia
@@ -122,12 +123,27 @@ def send_rosary(message):
 
 @bot.message_handler(commands=['folheto'])
 def send_folheto(message):
-    url = "https://www.arqrio.com.br/app/painel/amissa/amissa.pdf"
+    url = ""
+    tz = pytz.timezone('America/Sao_Paulo')
+    diff = 6 - datetime.datetime.now(tz).weekday()  # dias até domingo
+    next_sunday = datetime.datetime.now(tz).date() + datetime.timedelta(diff)  # próximo domingo
+    next_sunday = next_sunday.strftime("%d/%m/%Y")
+    try:
+        fol = re.get("https://arqrio.org.br/folhetos")
+        soup = BeautifulSoup(fol.content, 'html.parser')
+        cards = soup.find_all('div', attrs={'class': 'card'})
+        for card in cards:
+            if card.find('h3').text == next_sunday:
+                url = card.find_all('a')[1]['href']
+                break
+    except Exception as e:
+        bot.reply_to(message, "Algo deu errado. Entre em contato com o desenvolvedor")
     bot.send_document(message.chat.id,
                       document=url,
-                      caption="*Folheto para a santa missa dominical*.\n\n"
-                              "_Obs: Canções podem variar entre paróquias_",
-                      parse_mode='Markdown')
+                      caption="**Folheto para a santa missa dominical.**\n\n"
+                              "__Obs: Canções podem variar entre paróquias__",
+                      parse_mode='markdown',
+                      visible_file_name="a_missa.pdf")
 
 
 @bot.message_handler(commands=['biblia', 'bíblia'])
